@@ -1,0 +1,46 @@
+# Jekyll site
+# Package your Jekyll site using the jekyll/builder Docker container image.
+# Add steps that build, test, save build artifacts, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: Docker@0
+  displayName: 'Run Jekyll'
+  inputs:
+    containerRegistryType: 'Container Registry'
+    action: 'Run an image'
+    imageName: 'jekyll/builder:latest'
+    volumes: |
+      $(build.sourcesDirectory):/srv/jekyll
+      $(build.binariesDirectory):/srv/jekyll/_site
+    containerCommand: /bin/bash -c "chmod 777 /srv/jekyll && jekyll build"
+    detached: false
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifacts'
+  inputs:
+    PathtoPublish: '$(Build.binariesDirectory)'
+    ArtifactName: 'WEB'
+    publishLocation: 'Container'
+
+- task: AzureKeyVault@1
+  displayName: 'Access Keyvaults'
+  inputs:
+    azureSubscription: 'Visual Studio Enterprise Subscription(60f92b04-d5ea-4d9d-afcb-6aed8f166dc3)'
+    KeyVaultName: 'kvdemo1devops'
+    SecretsFilter: '*'
+    RunAsPreJob: true
+
+- task: AzureCLI@2
+  displayName: 'Copy Files'
+  inputs:
+    azureSubscription: 'Visual Studio Enterprise Subscription (60f92b04-d5ea-4d9d-afcb-6aed8f166dc3)'
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: "az storage blob upload-batch -d '$web' -s $(build.binariesDirectory --account-name $(demo1-devops-sta-name) --account-key $(demo1-devops-sta-key)"
